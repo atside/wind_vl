@@ -1,6 +1,6 @@
 from python
 
-copy *.py requirements.txt /src/
+copy *.py *.txt /src/
 workdir /src
 run pip install -r requirements.txt
 

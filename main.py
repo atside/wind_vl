@@ -1,7 +1,7 @@
+import os
 import requests
 import json
 import filework
-import settings
 import datetime
 import time
 from threading import Thread
@@ -47,6 +47,7 @@ all_areas_data = filework.read_data_file('shipsdata.txt')
 #         users_bd[user][1] = message.date
 #     filework.save_data_file(users_bd, filename)
 
+
 def wind_direction(deg):
     if type(deg) is not int:
         return 'что-то пошло не так'
@@ -70,6 +71,7 @@ def wind_direction(deg):
     def knots_to_ms(knots):
         return knots * 0.514
 
+
 def extract_data_str(num):
     wind_data = filework.read_data_file('wind_data.txt')[num]
     # print(wind_data)
@@ -82,6 +84,7 @@ def extract_data_str(num):
     except Exception:
         pass
     return res
+
 
 def get_ships_data(sleeptime):
     headers = {
@@ -103,18 +106,21 @@ def get_ships_data(sleeptime):
                 # print(b["data"]["rows"][0]["SHIP_ID"])
                 for x in range(len(b["data"]["rows"])):
                     ships_in_area.append(b["data"]["rows"][x]["SHIP_ID"])
-                current_time_str = datetime.datetime.strftime(datetime.datetime.now(offset), dt_format)
-                ships_in_area.append(current_time_str) # добавляем метку времени
+                current_time_str = datetime.datetime.strftime(
+                    datetime.datetime.now(offset), dt_format)
+                # добавляем метку времени
+                ships_in_area.append(current_time_str)
                 # print('получено: ', ships_in_area[-ships_count - 1:])
                 #filework.save_data_file(ships_in_area[:5], 'shipsdata.txt', areas[area_num][0])
                 all_areas_data[area] = ships_in_area[-ships_count - 1:]
             except Exception:
                 pass  # print('не удалось загрузить данные по району')
             time.sleep(10)
-        filework.save_data_file(all_areas_data, 'shipsdata.txt') # сохраняем всё в файл после цикла
+        # сохраняем всё в файл после цикла
+        filework.save_data_file(all_areas_data, 'shipsdata.txt')
         try:
             wind_data = filework.read_data_file('wind_data.txt')
-            for area_num in areas_list: # сохраняем данные по ветру
+            for area_num in areas_list:  # сохраняем данные по ветру
                 wind_data[area_num] = get_wind_data(area_num)
                 time.sleep(10)
             filework.save_data_file(wind_data, 'wind_data.txt')
@@ -122,6 +128,7 @@ def get_ships_data(sleeptime):
             pass  # print('ошибка обновления данных по ветру')
 
         time.sleep(sleeptime)
+
 
 def get_wind_data(area):
     headers = {
@@ -148,8 +155,10 @@ def get_wind_data(area):
     res.append(areas_list[area][0])
     return res
 
+
 def main():
-    bot = telebot.TeleBot(settings.API_KEY)
+    bot = telebot.TeleBot(os.getenv("API_KEY"))
+
     @bot.message_handler(commands=['start', 'help'])
     def start(message):
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -157,8 +166,9 @@ def main():
         btn2 = types.KeyboardButton('Патрокл')
         btn3 = types.KeyboardButton('Славянка')
         markup.add(btn1, btn2, btn3)
-        title = f'Выберите район:'  #\n{areas_for_user_input()}'
+        title = f'Выберите район:'  # \n{areas_for_user_input()}'
         bot.send_message(message.chat.id, title, reply_markup=markup)
+
     @bot.message_handler()
     def get_user_text(message):
         if message.text == 'Токаревский маяк':
@@ -176,5 +186,7 @@ def main():
     t1 = Thread(target=get_ships_data, args=(60,))
     t1.start()
     bot.polling(none_stop=True)
+
+
 if __name__ == '__main__':
     main()
