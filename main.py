@@ -4,16 +4,13 @@ import json
 import filework
 import datetime
 import time
+import signal
+
 from threading import Thread
 import telebot
 from telebot import types
 from datetime import timedelta, timezone
-# import logging
-# logging.basicConfig(
-#     level=logging.DEBUG,
-#     filename='mylog.log',
-#     format="%(asctime)s - %(module)s - %(levelname)s - %(funcName)s: %(lineno)d - %(message)s",
-#     datefmt='%H:%M:%S')
+import logging
 
 
 offset = timezone(timedelta(hours=10))
@@ -81,8 +78,8 @@ def extract_data_str(num):
             res += f'{data[0]}:\n'
             res += f'{data[1]} гр. ({wind_direction(data[1])}), {str(round(data[2] * 0.514, 1))} м/с\n'
             res += '\n'
-    except Exception:
-        pass
+    except Exception as e:
+        logging.error(f"failed to read file: {e}")
     return res
 
 
@@ -100,7 +97,7 @@ def get_ships_data(sleeptime):
                 # print(f'ищем район {areas_list[area][0]} по адресу {areas_list[area][1]}')
                 response = requests.get(url=url, headers=headers)
                 res1 = response.text
-                # print(res1)
+                print(res1)
                 b = json.loads(res1)
                 ships_in_area = []
                 # print(b["data"]["rows"][0]["SHIP_ID"])
@@ -113,8 +110,8 @@ def get_ships_data(sleeptime):
                 # print('получено: ', ships_in_area[-ships_count - 1:])
                 #filework.save_data_file(ships_in_area[:5], 'shipsdata.txt', areas[area_num][0])
                 all_areas_data[area] = ships_in_area[-ships_count - 1:]
-            except Exception:
-                pass  # print('не удалось загрузить данные по району')
+            except Exception as e:
+                logging.error(f"failed to load area data: {e}")
             time.sleep(10)
         # сохраняем всё в файл после цикла
         filework.save_data_file(all_areas_data, 'shipsdata.txt')
@@ -124,8 +121,8 @@ def get_ships_data(sleeptime):
                 wind_data[area_num] = get_wind_data(area_num)
                 time.sleep(10)
             filework.save_data_file(wind_data, 'wind_data.txt')
-        except Exception:
-            pass  # print('ошибка обновления данных по ветру')
+        except Exception as e:
+            logging.error(f"failed to save wind data: {e}")
 
         time.sleep(sleeptime)
 
@@ -189,4 +186,12 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    run = True
+    def stop():
+        run = False
+
+    signal.signal(signal.SIGINT, stop)
+    signal.signal(signal.SIGTERM, stop)
+    
+    while run:
+        main()
