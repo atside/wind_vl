@@ -175,6 +175,11 @@ def main():
 
     t1 = Thread(target=get_ships_data, args=(60,))
     t1.start()
-    bot.polling(none_stop=True)
+    while True:
+        try:
+            bot.polling(none_stop=True)
+        except Exception as e:
+            print(e)
+            time.sleep(5)
 if __name__ == '__main__':
     main()
