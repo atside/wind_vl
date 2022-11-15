@@ -180,6 +180,6 @@ def main():
             bot.polling(none_stop=True)
         except Exception as e:
             print(e)
-            time.sleep(5)
+            time.sleep(3)
 if __name__ == '__main__':
     main()
