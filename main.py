@@ -1,19 +1,16 @@
+import os
 import requests
 import json
 import filework
-import settings
 import datetime
 import time
+import signal
+
 from threading import Thread
 import telebot
 from telebot import types
 from datetime import timedelta, timezone
-# import logging
-# logging.basicConfig(
-#     level=logging.DEBUG,
-#     filename='mylog.log',
-#     format="%(asctime)s - %(module)s - %(levelname)s - %(funcName)s: %(lineno)d - %(message)s",
-#     datefmt='%H:%M:%S')
+import logging
 
 
 offset = timezone(timedelta(hours=10))
@@ -47,6 +44,7 @@ all_areas_data = filework.read_data_file('shipsdata.txt')
 #         users_bd[user][1] = message.date
 #     filework.save_data_file(users_bd, filename)
 
+
 def wind_direction(deg):
     if type(deg) is not int:
         return 'что-то пошло не так'
@@ -70,6 +68,7 @@ def wind_direction(deg):
     def knots_to_ms(knots):
         return knots * 0.514
 
+
 def extract_data_str(num):
     wind_data = filework.read_data_file('wind_data.txt')[num]
     # print(wind_data)
@@ -79,9 +78,10 @@ def extract_data_str(num):
             res += f'{data[0]}:\n'
             res += f'{data[1]} гр. ({wind_direction(data[1])}), {str(round(data[2] * 0.514, 1))} м/с\n'
             res += '\n'
-    except Exception:
-        pass
+    except Exception as e:
+        logging.error(f"failed to read file: {e}")
     return res
+
 
 def get_ships_data(sleeptime):
     headers = {
@@ -97,31 +97,35 @@ def get_ships_data(sleeptime):
                 # print(f'ищем район {areas_list[area][0]} по адресу {areas_list[area][1]}')
                 response = requests.get(url=url, headers=headers)
                 res1 = response.text
-                # print(res1)
+                print(res1)
                 b = json.loads(res1)
                 ships_in_area = []
                 # print(b["data"]["rows"][0]["SHIP_ID"])
                 for x in range(len(b["data"]["rows"])):
                     ships_in_area.append(b["data"]["rows"][x]["SHIP_ID"])
-                current_time_str = datetime.datetime.strftime(datetime.datetime.now(offset), dt_format)
-                ships_in_area.append(current_time_str) # добавляем метку времени
+                current_time_str = datetime.datetime.strftime(
+                    datetime.datetime.now(offset), dt_format)
+                # добавляем метку времени
+                ships_in_area.append(current_time_str)
                 # print('получено: ', ships_in_area[-ships_count - 1:])
                 #filework.save_data_file(ships_in_area[:5], 'shipsdata.txt', areas[area_num][0])
                 all_areas_data[area] = ships_in_area[-ships_count - 1:]
-            except Exception:
-                pass  # print('не удалось загрузить данные по району')
+            except Exception as e:
+                logging.error(f"failed to load area data: {e}")
             time.sleep(10)
-        filework.save_data_file(all_areas_data, 'shipsdata.txt') # сохраняем всё в файл после цикла
+        # сохраняем всё в файл после цикла
+        filework.save_data_file(all_areas_data, 'shipsdata.txt')
         try:
             wind_data = filework.read_data_file('wind_data.txt')
-            for area_num in areas_list: # сохраняем данные по ветру
+            for area_num in areas_list:  # сохраняем данные по ветру
                 wind_data[area_num] = get_wind_data(area_num)
                 time.sleep(10)
             filework.save_data_file(wind_data, 'wind_data.txt')
-        except Exception:
-            pass  # print('ошибка обновления данных по ветру')
+        except Exception as e:
+            logging.error(f"failed to save wind data: {e}")
 
         time.sleep(sleeptime)
+
 
 def get_wind_data(area):
     headers = {
@@ -148,8 +152,10 @@ def get_wind_data(area):
     res.append(areas_list[area][0])
     return res
 
+
 def main():
-    bot = telebot.TeleBot(settings.API_KEY)
+    bot = telebot.TeleBot(os.getenv("API_KEY"))
+
     @bot.message_handler(commands=['start', 'help'])
     def start(message):
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -157,8 +163,9 @@ def main():
         btn2 = types.KeyboardButton('Патрокл')
         btn3 = types.KeyboardButton('Славянка')
         markup.add(btn1, btn2, btn3)
-        title = f'Выберите район:'  #\n{areas_for_user_input()}'
+        title = f'Выберите район:'  # \n{areas_for_user_input()}'
         bot.send_message(message.chat.id, title, reply_markup=markup)
+
     @bot.message_handler()
     def get_user_text(message):
         if message.text == 'Токаревский маяк':
@@ -181,5 +188,14 @@ def main():
         except Exception as e:
             print(e)
             time.sleep(4)
+
 if __name__ == '__main__':
-    main()
+    run = True
+    def stop():
+        run = False
+
+    signal.signal(signal.SIGINT, stop)
+    signal.signal(signal.SIGTERM, stop)
+    
+    while run:
+        main()
